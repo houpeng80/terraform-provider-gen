@@ -2,7 +2,8 @@
 
 ## 概述
 
-terraform-provider-huaweicloud 是华为云的 Terraform Provider 实现，用于通过 Terraform 管理华为云资源。该项目基于 Terraform Plugin SDK v2 开发，遵循 Terraform Provider 的标准开发模式。
+terraform-provider-huaweicloud 是华为云的 Terraform Provider 实现，用于通过 Terraform 管理华为云资源。
+该项目基于 Terraform Plugin SDK v2 开发，遵循 Terraform Provider 的标准开发模式。
 
 ## 目录结构
 
@@ -88,7 +89,6 @@ func Provider() *schema.Provider {
 每个服务目录包含：
 - `resource_huaweicloud_*.go` - 资源实现文件
 - `data_source_huaweicloud_*.go` - 数据源实现文件
-- `common.go` - 服务公共方法（可选）
 
 ### 3. 配置管理 (config/)
 
@@ -101,19 +101,24 @@ func Provider() *schema.Provider {
 ### 4. 公共工具 (common/)
 
 提供通用功能：
-- `CheckDeleted` / `CheckDeletedDiag` - 处理资源不存在的情况
+- `CheckDeleted` / `CheckDeletedDiag` - 处理资源不存在的情况，在 ReadContext 和 DeleteContext 中使用。
 - `WaitOrderComplete` - 等待订单完成
 - `UnsubscribePrePaidResource` - 退订包周期资源
+- `GetRegion` - 获取 region，默认使用环境变量 HC_REGION_NAME
 
 ### 5. 工具函数 (utils/)
 
 提供类型转换、数据处理等工具：
 - `ExpandToStringList` - 接口数组转字符串数组
-- `PathSearch` - JMESPath 表达式查询
-- `RemoveNil` - 移除 map 中的 nil 值
+- `PathSearch` - JMESPath 表达式查询，常用在读取API返回数据时使用。
+- `RemoveNil` - 移除 map 中的 nil 值，调用API时使用避免空参数报错。
 - `TagsToMap` / `ExpandResourceTags` - 标签处理
 
 ## 资源命名规范
+
+### 包名
+
+一般是服务名称简写，如vpc。
 
 ### 文件命名
 
@@ -128,7 +133,7 @@ func Provider() *schema.Provider {
 
 | 函数类型 | 命名格式 | 示例 |
 |----------|----------|------|
-| Resource 定义 | `Resource<ResourceName>()` | `ResourceVirtualPrivateCloudV1()` |
+| Resource 定义 | `Resource<ResourceName>()` | `ResourceVirtualPrivateCloud()` |
 | Create | `resource<ResourceName>Create()` | `resourceVirtualPrivateCloudCreate()` |
 | Read | `resource<ResourceName>Read()` | `resourceVirtualPrivateCloudRead()` |
 | Update | `resource<ResourceName>Update()` | `resourceVirtualPrivateCloudUpdate()` |
@@ -140,18 +145,47 @@ func Provider() *schema.Provider {
 
 ### 主要依赖
 
+import 引入的顺序：标准库 -> 三方库 -> 二方库 -> 一方库，每类库用空行分割，
+其中：`github.com/chnsz/*` 和 `github.com/huaweicloud/<非本代码仓之外的其他仓库>` 视为二方库。
+
 ```go
-require (
-    github.com/hashicorp/terraform-plugin-sdk/v2  // Terraform Plugin SDK
-    github.com/chnsz/golangsdk                    // 华为云 Go SDK (OpenStack 风格)
-    github.com/huaweicloud/huaweicloud-sdk-go-v3  // 华为云 Go SDK v3
-    github.com/jmespath/go-jmespath               // JMESPath 查询
-)
+import (
+	// 标准库
+    "context"
+    "fmt"
+    "log"
+    "regexp"
+    "strconv"
+    "strings"
+    "time"
+
+	// 三方库
+    "github.com/hashicorp/go-multierror"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    
+	// 二方库
+    "github.com/chnsz/golangsdk"
+    "github.com/chnsz/golangsdk/openstack/common/tags"
+    v1rules "github.com/chnsz/golangsdk/openstack/networking/v1/security/rules"
+    v1groups "github.com/chnsz/golangsdk/openstack/networking/v1/security/securitygroups"
+    v2groups "github.com/chnsz/golangsdk/openstack/networking/v2/extensions/security/groups"
+    v3groups "github.com/chnsz/golangsdk/openstack/networking/v3/security/groups"
+    v3rules "github.com/chnsz/golangsdk/openstack/networking/v3/security/rules"
+    
+	// 一方库
+    "github.com/huaweicloud/terraform-provider-huaweicloud/huaweicloud/common"
+    "github.com/huaweicloud/terraform-provider-huaweicloud/huaweicloud/config"
+    "github.com/huaweicloud/terraform-provider-huaweicloud/huaweicloud/utils"
+    )
 ```
 
 ### SDK 选择
 
-项目使用两种 SDK：
+推荐使用 httpClient 的方式调用API，不推荐使用 SDK。
+
+不推荐使用的 SDK：
 1. **golangsdk** - OpenStack 风格 SDK，用于大部分 VPC、ECS 等基础服务
 2. **huaweicloud-sdk-go-v3** - 华为云官方 SDK v3，用于新服务和高级功能
 
@@ -159,32 +193,18 @@ require (
 
 ### 必需的环境变量
 
-```bash
-export HW_REGION_NAME="cn-north-4"        # 区域
-export HW_ACCESS_KEY="your-access-key"    # AK
-export HW_SECRET_KEY="your-secret-key"    # SK
-```
-
-### 可选环境变量
-
-```bash
-export HW_DOMAIN_NAME="your-domain-name"           # 账号名
-export HW_PROJECT_ID="your-project-id"             # 项目 ID
-export HW_ENTERPRISE_PROJECT_ID="your-eps-id"      # 企业项目 ID
-export HW_MAX_RETRIES="5"                          # 最大重试次数
-```
+必要的环境变量已配置完毕，可以直接启动调试。
 
 ### 运行测试
 
+单元测试是测试 Terraform Provider 的一种主要方式，用于验证资源定义是否正确，单元测试覆盖率必须是 80% 以上。
+
 ```bash
-# 运行单个测试
-go test -v -run TestAccVpcV1_basic ./huaweicloud/services/acceptance/vpc/
+# 运行单个测试，生成覆盖率报告
+TF_ACC=1 go test -covermode=atomic -v -coverprofile=coverage.out  -coverpkg=./huaweicloud ./huaweicloud/services/acceptance/vpc -run TestAccVpcV1_basic -timeout 360m -parallel 4
 
 # 运行所有 VPC 测试
-go test -v ./huaweicloud/services/acceptance/vpc/
-
-# 运行并生成覆盖率报告
-go test -cover ./huaweicloud/services/acceptance/vpc/
+TF_ACC=1 go test -covermode=atomic -v -coverprofile=coverage.out  -coverpkg=./huaweicloud ./huaweicloud/services/acceptance/vpc -run TestAcc* -timeout 360m -parallel 4
 ```
 
 ### 构建和安装
@@ -199,7 +219,8 @@ make install
 
 ## API 注释规范
 
-每个资源文件顶部应包含 API 注释，用于文档生成：
+每个资源文件顶部应包含 API 注释，用于文档生成。
+注释的格式： `// @API <Service_Name> <API_METHOD> <API_PATH>`
 
 ```go
 // @API VPC POST /v1/{project_id}/vpcs
@@ -207,9 +228,3 @@ make install
 // @API VPC PUT /v1/{project_id}/vpcs/{id}
 // @API VPC DELETE /v1/{project_id}/vpcs/{id}
 ```
-
-## 参考链接
-
-- [Terraform Plugin SDK v2 文档](https://www.terraform.io/plugin/sdkv2)
-- [华为云 API 文档](https://support.huaweicloud.com/api/)
-- [Terraform Provider 开发指南](https://www.terraform.io/plugin/developing-provider)

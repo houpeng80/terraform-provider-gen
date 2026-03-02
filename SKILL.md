@@ -38,7 +38,7 @@ description: "Develops Huawei Cloud Terraform Provider resources and data source
 - 核心组件介绍
 - 资源命名规范
 - 依赖说明
-- 开发环境配置
+- 开发环境和单元测试配置
 
 ### 02-resource-coding.md - Resource 编码开发技能
 
