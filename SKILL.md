@@ -98,7 +98,7 @@ description: "Develops Huawei Cloud Terraform Provider resources and data source
 
 ### 创建新 Resource
 
-1. 参考 [02-resource-coding.md](./02-resource-coding.md) 了解 Resource 结构
+1. 参考 [02-resource-coding.md](./02-resource-coding.md) 了解 Resource 的创建过程
 2. 在 `services/<service>/` 目录下创建 `resource_huaweicloud_<name>.go`
 3. 实现 CRUD 函数
 4. 在 `provider.go` 中注册资源

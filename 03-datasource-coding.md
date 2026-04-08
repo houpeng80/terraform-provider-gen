@@ -241,7 +241,7 @@ func dataSourceRdsBackupDatabasesRead(_ context.Context, d *schema.ResourceData,
 #### 3.4.3 如果API支持分页，并且URI中的请求方法不为 GET
 
 - 首先定义一个零时变量 `res` 保存查询结果
-- 定义分页参数，如果API中包含`limit`，则定义变量`limit`, 并且其值为API中允许设置的最大值，记为`maxLimit`，如果API是使用page+size分页，那么定义变量`page`，并且赋值为 `1`
+- 定义分页参数，如果API中包含`limit`， 记录API中允许设置的最大值，记为`maxLimit`，定义变量`offset`，如果API是使用page+size分页，那么定义变量`page`，并且赋值为 `1`
 - 如果请求参数在请求体中，首先需要构造请求体，函数名为 `buildGet{XXX}BodyParams`， 其中 `{XXX}` 为该API要获取的功能信息，其中要包含分页参数， 最后使用utils.RemoveNil去除掉值为nil的参数
 - 在for循环查询所有页的结果，请求参数依次为：URI中的请求方法、请求url、请求体
 - 通过函数 `flattenGet{XXX}Body` 解析当前查询结果，其中 `{XXX}` 为该参数的驼峰形式
@@ -305,7 +305,7 @@ func dataSourceRdsBackupDatabasesRead(_ context.Context, d *schema.ResourceData,
 
 - 如果该服务为全局函数，那么就不需要返回`region`，如果不是全局函数，那么就需要返回`region`
 - 如果参数类型不为对象或者列表，那么就直接从返回结果中获取后设置即可
-- 使用需要函数 `flattenGet{XXX}Body` 解析当前查询结果，其中 `{XXX}` 为该API要获取的功能信息
+- 如果参数类型为对象或者列表， 需要使用函数 `flattenGet{XXX}Body` 解析当前查询结果，其中 `{XXX}` 为该API要获取的功能信息
 
 ```go
     mErr = multierror.Append(
@@ -446,7 +446,7 @@ import (
 )
 ```
 
-## 6. 文件的包名为服务名的小写，,不是`package huaweicloud`，例如`package rds`
+## 6. 文件的包名为服务名的小写，不是`package huaweicloud`，例如`package rds`
 
 ## 7. 注册 Data Source 到 Provider
 
